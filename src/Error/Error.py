@@ -1,7 +1,7 @@
 import tensorflow as tf
 from src.Network.Model import Model
 from src.helper import *
-
+import math
 
 class Error:
 
@@ -113,7 +113,7 @@ class Error:
                         self._count += len(testing_ratings)
 
         self._mae = (self._mae*2)/self._count
-        self._rms = (self._rms*2)/self._count
+        self._rms = math.sqrt((self._rms*2)/self._count)
 
 
         print("Test Errors for trained model are MAE: {} and RMS: {} ".format(self._mae, self._rms))
