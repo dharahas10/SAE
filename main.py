@@ -8,13 +8,16 @@ from pprint import pprint
 # imports models
 from src.Trainer.SAETrainer import SAETrainer
 from src.Trainer.MultiSAETrainer import MultiSAETrainer
+from src.helper import duration
+from src.Error.Error import Error
 
 if __name__ == "__main__":
+    start = timeit.default_timer()
 
     print("-------------------Stacked Auto-Encoder-------------------")
     # Configuration location of the Network
     curr_dataset = 'ml-100k'
-    config_file = '1_U.json'
+    config_file = 'ml-100k_U.json'
     config_dir = './config/Train/'+curr_dataset
     # Check for the config file
     assert os.path.isfile(os.path.join(config_dir, config_file)), \
@@ -38,3 +41,10 @@ if __name__ == "__main__":
     # Trainer
     trainer = MultiSAETrainer() if config['isMulti'] else SAETrainer(config, info)
     trainer.train(train)
+
+    error = Error()
+    error_measure = error.measure(config, info, train, test)
+
+    end = timeit.default_timer()
+    mm, ss = duration(start, end)
+    print("Time taken to complete (mm:ss): {}:{}  ".format(mm, ss))

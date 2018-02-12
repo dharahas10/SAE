@@ -133,21 +133,19 @@ class SAETrainer(object):
 
     def _loadCheckpointSaver(self, config, saver, sess):
 
-        model_dir = config['save_model']['path']+self._type+'/'+str(self._nLayers)+'_'+str(config['hidden_neurons'])+'/'
-        if find_dir(model_dir):
+        if find_dir(config['save_model']['path']):
             # Found saved model
             print("Restoring From the previously Found Model .......")
-            saver.restore(sess, model_dir+config['save_model']['name'])
+            saver.restore(sess, config['save_model']['path']+config['save_model']['name'])
             print("Previous Model Found and restored Succesfully")
         else:
             print("No previously saved model found")
 
 
     def _saveCheckpoint(self, config, saver, sess):
-        model_dir = config['save_model']['path']+self._type+'/'+str(self._nLayers)+'_'+str(config['hidden_neurons'])+'/'
         # Save the variables to disk.
-        if not find_dir(model_dir):
-            make_dir(model_dir)
+        if not find_dir(config['save_model']['path']):
+            make_dir(config['save_model']['path'])
 
-        save_path = saver.save(sess, model_dir+config['save_model']['name'])
+        save_path = saver.save(sess, config['save_model']['path']+config['save_model']['name'])
         print("Model saved in file: %s" % save_path)

@@ -5,10 +5,10 @@
       "hidden_layers": 3,
       "hidden_neurons": [400,500,400],
       "activate_fn" : "tanh",
-      "epochs": 20,
+      "epochs": 1,
       "batch_size": 30,
       "save_model": {
-        "path": "./models/ml-100k/",
+        "path": "./models/ml-100k/U/3/",
         "name": "ml-100k.ckpt"
       },
       "isMulti": false,
