@@ -91,8 +91,8 @@ class SAETrainer(object):
                     print('\n------Current Per-Training Layer-{} ------'.format(layer_counter))
 
                     for epoch in range(self._epochs):
-                        print("\n Current Running Epoch is {}/{}"
-                          .format(epoch+1, self._epochs))
+                        print("\n PreTraining Layer: {}/{} and Current Running Epoch is {}/{}"
+                          .format(layer_counter, len*optimize_op_layers), epoch+1, self._epochs))
 
                         for indices, ratings in iterate_mini_batch(self._train,
                                                                   self._batch_size):
