@@ -1,0 +1,19 @@
+{
+      "dataset": "./processed_data/ml-100k/ml-100k.p",
+      "type": "U",
+      "seed": 0,
+      "hidden_layers": 3,
+      "hidden_neurons": [400,500,400],
+      "activate_fn" : "tanh",
+      "epochs": 20,
+      "batch_size": 30,
+      "save_model": {
+        "path": "./models/ml-100k/",
+        "name": "ml-100k.ckpt"
+      },
+      "isMulti": false,
+      "optimizer": {
+        "name": "GradientDescentOptimizer",
+        "learning_rate": 0.001
+      }
+  }

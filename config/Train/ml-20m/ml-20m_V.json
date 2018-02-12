@@ -1,0 +1,19 @@
+{
+      "dataset": "./processed_data/ml-20m/ml-20m.p",
+      "type": "V",
+      "seed": 0,
+      "hidden_layers": 3,
+      "hidden_neurons": [400,500,400],
+      "activate_fn" : "tanh",
+      "epochs": 20,
+      "batch_size": 30,
+      "save_model": {
+        "path": "./models/ml-20m/",
+        "name": "ml-20m.ckpt"
+      },
+      "isMulti": false,
+      "optimizer": {
+        "name": "GradientDescentOptimizer",
+        "learning_rate": 0.001
+      }
+  }
