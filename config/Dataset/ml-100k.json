@@ -1,0 +1,10 @@
+{
+    "dataset": "ml-100k",
+    "path": "../dataset/ml-100k",
+    "file_name": "u.data",
+    "delimiter": null,
+    "split_ratio": 0.9,
+    "out": "./processed_data/ml-100k/data.p",
+    "multi_rating": false
+
+}

@@ -1,0 +1,10 @@
+{
+    "dataset": "ml-1m",
+    "path": "../dataset/ml-1m",
+    "file_name": "ratings.csv",
+    "delimiter": "::",
+    "split_ratio": 0.9,
+    "out": "./processed_data/ml-1m.p",
+    "multi_rating": false
+
+}

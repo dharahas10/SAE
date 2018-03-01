@@ -1,0 +1,10 @@
+{
+    "name": "Movie Lens 1M Ratings (20-20)",
+    "path": "../new_dataset/ml-1m/",
+    "file_name": "ml-1m_U20_I20.csv",
+    "delimiter": ",",
+    "split_ratio": 0.9,
+    "out": "./processed_data/ml-1m/ml-1m-20.p",
+    "multi_rating": false
+
+}

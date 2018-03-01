@@ -1,0 +1,10 @@
+{
+    "dataset": "Trip Advisor",
+    "path": "../dataset/Trip Advisor",
+    "file_name": "tripadvisor_reviews.csv",
+    "delimiter": ";",
+    "split_ratio": 0.9,
+    "out": "./processed_data/tripadvisor.p",
+    "multi_rating": false
+
+}
