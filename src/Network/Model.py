@@ -1,171 +1,102 @@
-import tensorflow as tf
 import math
+
+import tensorflow as tf
+
+from src.utils.layers import get_layer_variables
+
 
 class Model():
     def __init__(self, config):
-        self._nLayers = config["hidden_layers"]
+
         self._hidden_neurons = config["hidden_neurons"]
-        self._batch_size = config["batch_size"]
-        self._optimizer = config['optimizer']
-        self._activate_fn = config['activate_fn']
+        self._nLayers = len(self._hidden_neurons)
+        self._input_neurons = None
 
-        self._pretrain_layer_weights = []
+        if config['normalization'] == 0:
+            self._activation_fn = 'sigmoid'
+        elif config['normalization'] == -1:
+            self._activation_fn = 'tanh'
 
+        # dropout-neurons
+        self._dropout = config['dropout']['bool']
+        self._keep_prob = 1
+        if self._dropout:
+            self._keep_prob = config['dropout']['keep_prob']
 
-    def _create_weights(self, shape, name=""):
-        return tf.get_variable("Weights_"+name,
-                               dtype=tf.float32,
-                               initializer=tf.random_uniform(shape,
-                                             minval=-1.0,
-                                             maxval=1.0),
-                               trainable=True)
+        # list to store all trainable variables
+        self.global_trainable_vars = []
 
+    def inference(self, inputs, input_size):
 
-    def _create_bias(self, shape, name=""):
-        return tf.get_variable("Bias_"+name,
-                               dtype=tf.float32,
-                               initializer=tf.constant(1.0, shape=[shape[1]]),
-                               trainable=False)
+        if self._input_neurons is None:
+            self._input_neurons = input_size
 
+        pretrain_layers = []
 
-    def _compute_layer(self, input_tensor, weights, biases, activate_fn, name):
+        layer_shapes = self.get_layer_shapes(self._input_neurons,
+                                             self._hidden_neurons)
 
-        if activate_fn == 'tanh':
-            return tf.tanh(
-                tf.add(tf.matmul(input_tensor, weights), biases), name=name)
-        else:
-            return tf.sigmoid(
-                tf.add(tf.matmul(input_tensor, weights), biases), name=name)
+        layer_input = inputs
+        for i in range(self._nLayers):
 
+            hidden_layer, hidden_weights_bias = get_layer_variables(layer_input, layer_shapes[i],
+                                                                    activation_fn=self._activation_fn,
+                                                                    dropout=self._dropout,
+                                                                    keep_prob=self._keep_prob,
+                                                                    name=str(i+1))
+            layer_input = hidden_layer
+            self.global_trainable_vars += hidden_weights_bias
 
+            if i < self._nLayers-1:
+                # another layer for pre-training each layer
+                extra_layer_shape = [layer_shapes[i][1], self._input_neurons]
+                extra_layer, extra_weights_bias = get_layer_variables(hidden_layer, extra_layer_shape,
+                                                                      activation_fn=self._activation_fn,
+                                                                      name=str(i+1)+"_decoder")
 
-    def inference(self,input_neurons, input_tensor):
+                trainable_vars = []
+                trainable_vars += hidden_weights_bias
+                trainable_vars += extra_weights_bias
 
-        self._input_neurons = input_neurons
-        self._output_neurons = self._input_neurons
+                pretrain_layers.append({
+                    'layer': extra_layer,
+                    'train_vars': trainable_vars
+                })
 
+        # Final Layer : a bit different includes all weights and biases for training
+        final_layer, final_weights_bias = get_layer_variables(layer_input, layer_shapes[self._nLayers],
+                                                              activation_fn=self._activation_fn,
+                                                              name="output")
+        self.global_trainable_vars += final_weights_bias
 
-        for layer in range(self._nLayers):
+        trainable_vars = []
+        trainable_vars += hidden_weights_bias
+        trainable_vars += final_weights_bias
+        # For training only last layer
+        pretrain_layers.append({
+            'layer': final_layer,
+            'train_vars': trainable_vars
+        })
 
-            # Computing Shapes of Weights and Biases for each hidden-layer
-            if layer == 0:
-                shape = [self._input_neurons, self._hidden_neurons[layer]]
-                # pretrain_shape = [self._hidden_neurons[layer], self._input_neurons]
-                layer_name = "Hidden-Layer-{}".format(layer+1)
+        # For trianing complete layer
+        if self._nLayers > 1:
+            pretrain_layers.append({
+                'layer': final_layer,
+                'train_vars': self.global_trainable_vars
+            })
 
+        return pretrain_layers
+
+    def get_layer_shapes(self, input_neurons, hidden_neurons):
+
+        nLayers = len(hidden_neurons)
+        shapes = []
+        for i in range(nLayers+1):
+            if i == 0:
+                shapes.append([input_neurons, hidden_neurons[i]])
+            elif i == nLayers:
+                shapes.append([hidden_neurons[i-1], input_neurons])
             else:
-                shape = [self._hidden_neurons[layer-1], self._hidden_neurons[layer]]
-                layer_name = "Hidden-Layer-{}".format(layer+1)
+                shapes.append([hidden_neurons[i-1], hidden_neurons[i]])
 
-            print(shape)
-
-            # Creating layers for model
-            with tf.variable_scope(layer_name) as scope:
-                weights = self._create_weights(shape, layer_name)
-                biases = self._create_bias(shape, layer_name)
-
-                layer_output = self._compute_layer(input_tensor, weights,
-                                                   biases,
-                                                   self._activate_fn,
-                                                   scope.name)
-
-                # Temparary weights and biases used for pre=training the hidden layers
-                tmp_weights = self._create_weights([shape[1], shape[0]], "pretrain_weight")
-                tmp_biases = self._create_bias([shape[1], shape[0]], 'pretrian_bias')
-                pretrain_layer = self._compute_layer(layer_output, tmp_weights,
-                                                     tmp_biases,
-                                                     self._activate_fn,
-                                                     scope.name+'-pretrain')
-                self._pretrain_layer_weights.append({ 'output_layer': pretrain_layer,
-                                                     'input_tensor': input_tensor,
-                                                     'var_list': [weights, tmp_weights]})
-
-                input_tensor = layer_output
-
-
-        output_shape = [self._hidden_neurons[-1], self._output_neurons]
-        layer_name = 'Output-Layer'
-        print(output_shape)
-        with tf.variable_scope(layer_name) as scope:
-            weights = self._create_weights(output_shape, layer_name)
-            biases = self._create_bias(output_shape, layer_name)
-
-            output_layer = self._compute_layer(input_tensor, weights,
-                                               biases,
-                                               self._activate_fn,
-                                               scope.name)
-
-
-        return self._pretrain_layer_weights, output_layer
-
-
-    def loss_fn(self, input_tensor, predict_tensor):
-        with tf.variable_scope('loss') as scope:
-            nonzero_bool = tf.not_equal(input_tensor, tf.constant(0, tf.float32))
-            nonzero_mat = tf.cast(nonzero_bool, tf.float32)
-            predict_nonzero = tf.multiply(predict_tensor, nonzero_mat)
-            cross_entropy = tf.squared_difference(predict_nonzero, input_tensor)
-            cost = tf.reduce_mean(cross_entropy, name=scope.name)
-
-        return cost
-
-
-    def optimizer(self,):
-        pass
-
-
-    def error(self, output, l_out):
-        with tf.variable_scope("Error") as scope:
-            nonzero_matrix = tf.cast(
-                tf.not_equal(output, tf.constant(0, tf.float32)),
-                tf.float32
-            )
-
-            l_out_nonzero = tf.multiply(l_out, nonzero_matrix)
-            nonzero_count = tf.reduce_sum(nonzero_matrix)
-            with tf.variable_scope("MAE") as sub_scope:
-                mae = tf.multiply(
-                        tf.truediv(
-                            tf.reduce_sum(
-                                tf.abs(
-                                    tf.subtract(l_out_nonzero,
-                                                output))),
-                            nonzero_count),
-                        tf.constant(2, tf.float32),
-                        name=sub_scope.name)
-
-            with tf.variable_scope("RMS") as sub_scope:
-                rms = tf.multiply(
-                        tf.truediv(
-                            tf.reduce_sum(
-                                tf.square(
-                                    tf.subtract(l_out_nonzero,
-                                                output))),
-                            nonzero_count),
-                        tf.constant(2, tf.float32),
-                        name=sub_scope.name)
-
-            return mae, rms
-
-
-    def _error_mini_batch(self, X, Y):
-        with tf.variable_scope("error_mini_batch") as scope:
-            nonzero_mat = tf.cast(
-                tf.not_equal(X, tf.constant(0, tf.float32)),
-                tf.float32
-            )
-            Y_nonzero = tf.multiply(Y, nonzero_mat)
-
-            with tf.variable_scope("mae") as sub_scope:
-                mae = tf.reduce_sum(
-                    tf.abs(
-                        tf.subtract(Y_nonzero, X)
-                    )
-                , name=sub_scope.name)
-
-            with tf.variable_scope("rms") as sub_scope:
-                rms = tf.reduce_sum(
-                    tf.squared_difference(Y_nonzero, X)
-                , name=sub_scope.name)
-
-        return mae, rms
+        return shapes

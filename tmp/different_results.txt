@@ -1,0 +1,77 @@
+dataset_normalization_optimization_regularisation_layers_hiddenNeurons
+
+ex:
+
+tanh= normalisation ratings to (-1)-1
+sigmoid= normalisation ratings to 0-1
+
+# ==> Simple network with normalisation=tanh, optimization=gradientDescent
+ml-100k_tanh_gD_1_[500]
+ml-100k_tanh_gD_2_[500,500]
+ml-100k_tanh_gD_3_[500,500,500]
+ml-100k_tanh_gD_5_[1000,750,500,750,1000]
+ml-100k_tanh_gD_7_[1000,800,700,500,700,800,1000]
+ml-100k_tanh_gD_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with tanh normalisation, optimization=gradientDescent(gD)
+ml-100k_sigmoid_gD_1_[500]
+ml-100k_sigmoid_gD_2_[500,500]
+ml-100k_sigmoid_gD_3_[500,500,500]
+ml-100k_sigmoid_gD_5_[1000,750,500,750,1000]
+ml-100k_sigmoid_gD_7_[1000,800,700,500,700,800,1000]
+ml-100k_sigmoid_gD_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with normalisation=tanh, optimization=adam
+ml-100k_tanh_adam_1_[500]
+ml-100k_tanh_adam_2_[500,500]
+ml-100k_tanh_adam_3_[500,500,500]
+ml-100k_tanh_adam_5_[1000,750,500,750,1000]
+ml-100k_tanh_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_tanh_adam_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with normalisation=sigmoid, optimization=adam
+ml-100k_sigmoid_adam_1_[500]
+ml-100k_sigmoid_adam_2_[500,500]
+ml-100k_sigmoid_adam_3_[500,500,500]
+ml-100k_sigmoid_adam_5_[1000,750,500,750,1000]
+ml-100k_sigmoid_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_sigmoid_adam_9_[1000,800,600,500,360,500,600,800,1000]
+
+<?----------------------?>
+
+
+
+
+>
+
+# ==> Simple network with normalisation=tanh, optimization=gradientDescent, regularization=L2
+ml-100k_tanh_gD_adam_1_[500]
+ml-100k_tanh_gD_adam_2_[500,500]
+ml-100k_tanh_gD_adam_3_[500,500,500]
+ml-100k_tanh_gD_adam_5_[1000,750,500,750,1000]
+ml-100k_tanh_gD_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_tanh_gD_adam_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with tanh normalisation, optimization=gradientDescent(gD), regularization=L2
+ml-100k_sigmoid_gD_adam_1_[500]
+ml-100k_sigmoid_gD_adam_2_[500,500]
+ml-100k_sigmoid_gD_adam_3_[500,500,500]
+ml-100k_sigmoid_gD_adam_5_[1000,750,500,750,1000]
+ml-100k_sigmoid_gD_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_sigmoid_gD_adam_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with normalisation=tanh, optimization=adam, regularization=L2
+ml-100k_tanh_adam_adam_1_[500]
+ml-100k_tanh_adam_adam_2_[500,500]
+ml-100k_tanh_adam_adam_3_[500,500,500]
+ml-100k_tanh_adam_adam_5_[1000,750,500,750,1000]
+ml-100k_tanh_adam_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_tanh_adam_adam_9_[1000,800,600,500,360,500,600,800,1000]
+
+# ==> Simple network with normalisation=sigmoid, optimization=adam, regularization=L2
+ml-100k_sigmoid_adam_adam_1_[500]
+ml-100k_sigmoid_adam_adam_2_[500,500]
+ml-100k_sigmoid_adam_adam_3_[500,500,500]
+ml-100k_sigmoid_adam_adam_5_[1000,750,500,750,1000]
+ml-100k_sigmoid_adam_adam_7_[1000,800,700,500,700,800,1000]
+ml-100k_sigmoid_adam_adam_9_[1000,800,600,500,360,500,600,800,1000]

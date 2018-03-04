@@ -1,0 +1,12 @@
+-main
+--data normailsation
+--Trainer.execute
+----Network Build
+------layers
+------wights and biases
+----Epoch
+-----Train
+-----Test
+------rms, mae
+----BestRMS, BestMAE
+-end

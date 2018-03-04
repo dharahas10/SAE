@@ -3,5 +3,4 @@ processed_data
 saved_models
 .DS_Store
 test.py
-models
 .vscode

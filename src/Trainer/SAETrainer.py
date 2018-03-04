@@ -1,151 +1,231 @@
-import tensorflow as tf
-from src.Network.Model import Model
-from src.helper import *
 import math
+import time
+from pprint import pprint
+
+import tensorflow as tf
+
+from src.helper import duration, iterate_mini_batchOne, iterate_mini_batchTwo
+from src.Network.Model import Model
+from src.utils.errors import error_fn
+from src.utils.losses import loss_fn
+from src.utils.optimizer import optimize_fn
+from src.utils.saver import loadCheckpointSaver, saveCheckpoint
+from src.utils.tf_helper import corruptData, get_global_step
+
 
 class SAETrainer(object):
 
     def __init__(self, config, info):
-        print("----------------Stacked Auto-Encoder Trainer----------------")
-        self._type = config['type']
 
-        if self._type == 'U':
-            self._input_neurons = info['nV']
-        else:
-            self._input_neurons = info['nU']
-
+        print("\n----------------Stacked Auto-Encoder Trainer----------------")
+        self._input_neurons = info['nItems']+1
         self._output_nuerons = self._input_neurons
         self._batch_size = config['batch_size']
         self._epochs = config['epochs']
-        self._nLayers = config['hidden_layers']
+        self._nLayers = len(config['hidden_neurons'])
+
+        # noisy hyperparameters
+        self._isNoisy = config['noise']['isNoisy']
+        self._noiseConfig = None
+        if self._isNoisy:
+            self._noiseRatio = config['noise']['noiseRatio']
+            self._noiseConfig = {}
+            self._noiseConfig['alpha'] = config['noise']['alpha']
+            self._noiseConfig['beta'] = config['noise']['beta']
+
+        # regularization hyperparameter
+        self._regularization = config['regularization']['l2_regularization']
+        self._l2_beta = 0
+        if self._regularization:
+            self.l2_beta = config['regularization']['l2_beta']
+
+        # optimization hyperparameters
+        self._optimizer_config = config['optimizer']
+
+        # normalization parameters
+        self._normalization = config['normalization']
+
+        # model saving details
+        self._save_path = config['save_model']['path']
+        self._save_name = config['save_model']['name']
+
+        # errors
+        self._bestRMSE = 999999
+        self._bestMAE = 999999
+        self._rmse = []
+        self._mae = []
+        # setting random seed for tensorflow
+        tf.set_random_seed(config['seed'])
         self._config = config
 
-        self._optimizer = self._get_optimizer_fn(config['optimizer'])
-
-
-    def _get_optimizer_fn(self, op_config):
-        if op_config['name'] == 'GradientDescentOptimizer':
-            print('--------------- Trainer using GradientDescentOptimizer -----------')
-            self._learning_rate = op_config['learning_rate']
-            optimizer = tf.train.GradientDescentOptimizer(self._learning_rate)
-
-        return optimizer
-
-
-    def optimize_fn(self, loss, trainable_weights):
-        return self._optimizer.minimize(loss,
-                                        var_list=trainable_weights)
-
-
-
-    def train(self, train_data):
-
-        self._train = train_data[self._type]['data']
+    def build_graph(self):
 
         model = Model(self._config)
+        graph = tf.Graph()
 
-        with tf.Graph().as_default():
-
+        with graph.as_default():
+            # Train graph
+            # input placeholders
             train_indices = tf.placeholder(tf.int32, name='train_indices')
             train_values = tf.placeholder(tf.float32, name='train_values')
-            shape = [self._batch_size, self._input_neurons]
-            # Dense train input data
-            X = tf.sparse_to_dense(train_indices, shape, train_values, name='X')
+            train_shape = [self._batch_size, self._input_neurons]
 
-            pretrain_layers_weights, predict_layer = model.inference(self._input_neurons,X)
+            # Sparse to Dense train_input
+            X = tf.sparse_to_dense(train_indices,
+                                   train_shape,
+                                   train_values,
+                                   name='X')
+            Y = X  # input == output *autoencoder*
 
-            loss_op_layers = []
-            optimize_op_layers = []
+            if self._isNoisy:
+                X = corruptData(train_indices, train_values, train_shape,
+                                noiseRatio=self._noiseRatio,
+                                name='noisy_X')
 
-            for layer_dict in pretrain_layers_weights:
-                curr_predict = layer_dict['output_layer']
-                curr_input = layer_dict['input_tensor']
-                curr_trainable_weights = layer_dict['var_list']
-                curr_loss_op = model.loss_fn(curr_input, curr_predict)
-                loss_op_layers.append(curr_loss_op)
+            # Get all layers for training
+            pretrain_layers = model.inference(X, self._input_neurons)
 
-                curr_optimize_op = self.optimize_fn(curr_loss_op, curr_trainable_weights)
-                optimize_op_layers.append(curr_optimize_op)
+            optimize_ops_list = []
+            # loss_ops_list = []
 
-            # predict_layer optimization
-            loss_op_predict = model.loss_fn(X, predict_layer)
-            loss_op_layers.append(curr_loss_op)
-            optimiz_op_predict = self.optimize_fn(loss_op_predict, None)
-            optimize_op_layers.append(optimiz_op_predict)
+            layer_counter = 1
+            for layer_info in pretrain_layers:
 
+                layer = layer_info['layer']
+                train_vars = layer_info['train_vars']
 
-            mae_op, rms_op = model._error_mini_batch(X, predict_layer)
+                global_step_tensor = get_global_step(
+                    name='layer_'+str(layer_counter))
+                layer_counter += 1
 
-            init = tf.global_variables_initializer()
+                loss_op = loss_fn(Y, layer,
+                                  noisy_input=X,
+                                  isNoisy=self._isNoisy,
+                                  noisyConfig=self._noiseConfig,
+                                  l2_reg=self._regularization,
+                                  l2_beta=self._l2_beta,
+                                  trainable_vars=train_vars)
 
-            # saver model
+                optimize_op = optimize_fn(self._optimizer_config, loss_op,
+                                          train_vars=train_vars,
+                                          global_step=global_step_tensor)
+
+                # loss_ops_list.append(loss_op)
+                optimize_ops_list.append(optimize_op)
+            # pprint(optimize_ops_list)
+
+            # test graph
+            test_indices = tf.placeholder(tf.int32, name="test_indices")
+            test_values = tf.placeholder(tf.float32, name='test_values')
+            test_shape = test_shape = [self._batch_size, self._input_neurons]
+            # test_input
+            test_tensor = tf.sparse_to_dense(
+                test_indices, test_shape, test_values, name='test_tensor')
+
+            # since Y is original non-corrupt input from above
+            X = Y
+            pretrain_test_layers = model.inference(X, self._input_neurons)
+            # pprint(pretrain_test_layers)
+
+            error_ops_list = []
+            for layer_info in pretrain_test_layers:
+
+                predict_ = layer_info['layer']
+                error_op = error_fn(test_tensor, predict_)
+                error_ops_list.append(error_op)
+            # pprint(error_ops_list)
+
+        return graph, optimize_ops_list, error_ops_list, {'train_indices': train_indices,
+                                                          'train_values': train_values,
+                                                          'test_indices': test_indices,
+                                                          'test_values': test_values}
+
+    def execute(self, train_data, test_data):
+
+        self._train = train_data
+        self._test = test_data
+
+        # Build Graph
+        graph, optimize_ops_list, error_ops_list, feed_dict = self.build_graph()
+        # check lengths of layers
+        assert len(optimize_ops_list) == len(
+            error_ops_list), "ERROR:: lengths of optimize_ops_list and error_ops_list are not equal"
+
+        # start session
+        with tf.Session(graph=graph) as sess:
+
+            sess.run(tf.global_variables_initializer())
             saver = tf.train.Saver()
 
-            with tf.Session() as sess:
-                sess.run(init)
-                self._loadCheckpointSaver(self._config, saver, sess)
+            # Load graph if already saved
+            loadCheckpointSaver(self._save_path,
+                                self._save_name,
+                                self._config,
+                                saver, sess)
 
-                print("------- Pre-Training Strating ----------")
-                layer_counter = 1
-                for optim_layer in optimize_op_layers:
-                    print('\n------Current Per-Training Layer-{} ------'.format(layer_counter))
+            # Train/Optimize each layer
+            for i in range(len(optimize_ops_list)):
+                print(
+                    "\n===================== Training Layer-{} ===============".format(i+1))
+                training_layer_start = time.time()
 
-                    for epoch in range(self._epochs):
-                        print("\n PreTraining Layer: {}/{} and Current Running Epoch is {}/{}"
-                          .format(layer_counter, len*optimize_op_layers), epoch+1, self._epochs))
+                optimize_op = optimize_ops_list[i]
+                error_op = error_ops_list[i]
 
-                        for indices, ratings in iterate_mini_batch(self._train,
-                                                                  self._batch_size):
+                for epoch in range(1, self._epochs+1):
+                    print(
+                        "===> [ current epoch: {}/{} ]".format(epoch, self._epochs))
 
-                            _ = sess.run(optim_layer,
-                                         {train_indices: indices,
-                                          train_values: ratings})
+                    # train with mini-batches
+                    batch_counter = 1
+                    for batch in iterate_mini_batchOne(self._train, self._batch_size):
+                        # print("[current Bactch counter : {}".format(batch_counter))
+                        batch_counter += 1
 
+                        _ = sess.run(optimize_op, {
+                            feed_dict['train_indices']: batch['indices'],
+                            feed_dict['train_values']: batch['values']
+                        })
 
-                    self._saveCheckpoint(self._config, saver, sess)
-                    layer_counter += 1
+                # testing each layer for rmse and mae
+                mse = 0
+                mae = 0
+                noRatings = 0
+                for test_batch, train_batch in iterate_mini_batchTwo(self._test, self._train, self._batch_size):
 
+                    local_mse, local_mae = sess.run([error_op['mse'], error_op['mae']], {
+                        feed_dict['train_indices']: train_batch['indices'],
+                        feed_dict['train_values']: train_batch['values'],
+                        feed_dict['test_indices']: test_batch['indices'],
+                        feed_dict['test_values']: test_batch['values']
+                    })
+                    mse += local_mse
+                    mae += local_mae
+                    # assert local_nonzero_count == len(test_batch['values']), "ERROR:: testing nonzero_counts of values are not equal values: {} and sess: {}".format(len(test_batch['values']), local_nonzero_count)
+                    noRatings += len(test_batch['values'])
 
+                if self._normalization == 0:
+                    rmse = math.sqrt(mse/noRatings) * 5
+                    mae = (mae/noRatings) * 5
+                else:
+                    rmse = math.sqrt(mse/noRatings) * 2
+                    mae = (mae/noRatings) * 2
 
+                self._rmse.append(rmse)
+                self._mae.append(mae)
 
-                print("\n\n-----------------Calculating the error-------")
-                tmp_mae = 0
-                tmp_rms = 0
-                tmp_count = 0
-                counter = 0
-                for indices, ratings in iterate_mini_batch(self._train,
-                                                          self._batch_size):
+                training_layer_end = time.time()
+                print("[RMSE => {} and MAE => {} and time : {}]".format(
+                    rmse, mae, duration(training_layer_start, training_layer_end)))
 
-                    curr_mae, curr_rms = sess.run([mae_op, rms_op],
-                                                  {train_indices: indices,
-                                                   train_values: ratings})
+                # save model for later
+                saveCheckpoint(self._save_path, self._save_name,
+                               self._config, saver, sess)
 
-                    tmp_mae += curr_mae
-                    tmp_rms += curr_rms
-                    tmp_count += len(ratings)
-                    counter +=1
-                    print("Current Counter {} and MAE: {} and RMS: {}".format(counter, tmp_mae, tmp_rms))
-
-            print("-----------------------------------------------------------")
-            print("----------------Training Completed------------------")
-            print("Total MAE: {} and RMS: {}".format(tmp_mae*2/tmp_count, math.sqrt(tmp_rms*2/tmp_count)))
-
-
-    def _loadCheckpointSaver(self, config, saver, sess):
-
-        if find_dir(config['save_model']['path']):
-            # Found saved model
-            print("Restoring From the previously Found Model .......")
-            saver.restore(sess, config['save_model']['path']+config['save_model']['name'])
-            print("Previous Model Found and restored Succesfully")
-        else:
-            print("No previously saved model found")
-
-
-    def _saveCheckpoint(self, config, saver, sess):
-        # Save the variables to disk.
-        if not find_dir(config['save_model']['path']):
-            make_dir(config['save_model']['path'])
-
-        save_path = saver.save(sess, config['save_model']['path']+config['save_model']['name'])
-        print("Model saved in file: %s" % save_path)
+        # Best RMSE and MAE
+        self._bestMAE = min(self._mae)
+        self._bestRMSE = min(self._rmse)
+        print("\n\n================================================")
+        print("\n\n\t The Best RMSE: {0:.4f}  and Best MAE: {1:.4f} ".format(
+            self._bestRMSE/1.0000, self._bestMAE/1.0000))
+        print("\n Successfully Trained!!!!")
