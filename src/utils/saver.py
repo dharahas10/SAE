@@ -43,13 +43,16 @@ def generate_path(path, config):
     else:
         dir_str += '_'+'tanh'
 
-    if config['noise']['isNoisy']:
-        dir_str += '_'+'noise'
     if config['regularization']['l2_regularization']:
         dir_str += '_'+'l2-reg'
     if config['dropout']['bool']:
         dir_str += '_'+'dropout'
-
+    
+    if config['optimizer']['name'] == 'gradientdescentoptimizer':
+        dir_str += '_'+'gD'
+    else:
+        dir_str += '_'+'adam'
+    
     hidden_str = '('
     for val in config['hidden_neurons']:
         hidden_str += str(val)+','
