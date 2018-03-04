@@ -18,7 +18,7 @@ class SAETrainer(object):
     def __init__(self, config, info):
 
         print("\n----------------Stacked Auto-Encoder Trainer----------------")
-        self._input_neurons = info['nItems']+1
+        self._input_neurons = info['nItems']
         self._output_nuerons = self._input_neurons
         self._batch_size = config['batch_size']
         self._epochs = config['epochs']
