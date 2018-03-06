@@ -1,0 +1,10 @@
+{
+    "name": "Yahoo Movies 10M Ratings (20-20)",
+    "path": "../new_dataset/yahoo/",
+    "file_name": "ratings_20.csv",
+    "delimiter": "::",
+    "split_ratio": 0.9,
+    "out": "./processed_data/yahoo/yahoo-20.p",
+    "multi_rating": false
+
+}

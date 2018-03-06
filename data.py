@@ -37,6 +37,6 @@ def main(config_file, config_dir):
 if __name__ == "__main__":
 
     config_file = '20.json'
-    config_dir = './config/Dataset/ml-10m'
+    config_dir = './config/Dataset/yahoo'
 
     main(config_file, config_dir)
